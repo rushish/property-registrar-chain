@@ -20,7 +20,13 @@ struct Block {
     int index;
     time_t timestamp;
     char data[BLOCK_SIZE];
-    char originalData[BLOCK_SIZE];  // Store the original case data
+    char originalData[BLOCK_SIZE];
+    char propertyName[50];
+    char address[100];
+    char city[50];
+    char postalCode[10];
+    char rent[20];
+    char sellingPrice[20];
     char prevHash[64];
     char hash[64];
     struct Block *next;
@@ -42,19 +48,46 @@ void calculateHash(struct Block *block) {
     block->hash[SHA256_DIGEST_LENGTH] = '\0';
 }
 
-struct Block *createBlock(struct Block *prevBlock, char *data) {
+struct Block *createBlock(struct Block *prevBlock, char *data, char *propertyName, char *address, char *city, char *postalCode, char *rent, char *sellingPrice) {
     struct Block *newBlock = (struct Block *)malloc(sizeof(struct Block));
     newBlock->index = prevBlock->index + 1;
     newBlock->timestamp = time(NULL);
     strcpy(newBlock->data, data);
     strcpy(newBlock->originalData, data);
+    strcpy(newBlock->propertyName, propertyName);
+    strcpy(newBlock->address, address);
+    strcpy(newBlock->city, city);
+    strcpy(newBlock->postalCode, postalCode);
+    strcpy(newBlock->rent, rent);
+    strcpy(newBlock->sellingPrice, sellingPrice);
     strcpy(newBlock->prevHash, prevBlock->hash);
     newBlock->next = NULL;
     calculateHash(newBlock);
     return newBlock;
 }
 
-// Function to free the entire linked list
+void deletePropertyByName(struct Block **blockchain, int *chainLength, char *propertyName) {
+    struct Block *currentBlock = *blockchain;
+    struct Block *prevBlock = NULL;
+
+    while (currentBlock) {
+        if (strcmp(currentBlock->propertyName, propertyName) == 0) {
+            if (prevBlock) {
+                prevBlock->next = currentBlock->next;
+            } else {
+                *blockchain = currentBlock->next;
+            }
+            free(currentBlock);
+            (*chainLength)--;
+            printf("Property '%s' deleted.\n", propertyName);
+            return;
+        }
+        prevBlock = currentBlock;
+        currentBlock = currentBlock->next;
+    }
+    printf("Property '%s' not found.\n");
+}
+
 void freeBlockchain(struct Block *head) {
     while (head) {
         struct Block *temp = head;
@@ -63,18 +96,17 @@ void freeBlockchain(struct Block *head) {
     }
 }
 
-void inputString(const char *prompt, char *dest, size_t destSize) {
-    printf("%s", prompt);
-    fgets(dest, destSize, stdin);
-    dest[strcspn(dest, "\n")] = '\0';
-}
-
 void displayBlockchain(struct Block *blockchain) {
     struct Block *currentBlock = blockchain;
     int i = 0;
     while (currentBlock) {
         printf("Property #%d:\n", i);
-        printf("%s\n", currentBlock->originalData);
+        printf("Property Name: %s\n", currentBlock->propertyName);
+        printf("Address: %s\n", currentBlock->address);
+        printf("City: %s\n", currentBlock->city);
+        printf("Postal Code: %s\n", currentBlock->postalCode);
+        printf("Rent: %s\n", currentBlock->rent);
+        printf("Selling Price: %s\n", currentBlock->sellingPrice);
         printf("Timestamp: %ld\n", currentBlock->timestamp);
         printf("Prev Hash: %s\n", currentBlock->prevHash);
         printf("Hash: %s\n\n", currentBlock->hash);
@@ -95,27 +127,41 @@ int authenticateUser(struct User *users, int numUsers, char *username, char *pas
 
 void addPropertyForAuction(struct Block **blockchain, int *chainLength, int isAdmin) {
     char propertyData[BLOCK_SIZE];
+    char propertyName[50];
+    char address[100];
+    char city[50];
+    char postalCode[10];
+    char rent[20];
+    char sellingPrice[20];
 
-    inputString("Enter Property Name: ", propertyData, sizeof(propertyData));
-    strncat(propertyData, "\nAddress: ", sizeof(propertyData) - strlen(propertyData) - 1);
-    inputString("Enter Address: ", propertyData + strlen(propertyData), sizeof(propertyData) - strlen(propertyData));
-    strncat(propertyData, "\nCity: ", sizeof(propertyData) - strlen(propertyData) - 1);
-    inputString("Enter City: ", propertyData + strlen(propertyData), sizeof(propertyData) - strlen(propertyData));
-    strncat(propertyData, "\nPostal Code: ", sizeof(propertyData) - strlen(propertyData) - 1);
-    inputString("Enter Postal Code: ", propertyData + strlen(propertyData), sizeof(propertyData) - strlen(propertyData));
-    strncat(propertyData, "\nRent: ", sizeof(propertyData) - strlen(propertyData) - 1);
-    inputString("Enter Rent: ", propertyData + strlen(propertyData), sizeof(propertyData) - strlen(propertyData));
-    strncat(propertyData, "\nSelling Price: ", sizeof(propertyData) - strlen(propertyData) - 1);
-    inputString("Enter Selling Price: ", propertyData + strlen(propertyData), sizeof(propertyData) - strlen(propertyData));
+    printf("Enter Property Name: ");
+    inputString("", propertyName, sizeof(propertyName));
+
+    printf("Enter Address: ");
+    inputString("", address, sizeof(address));
+
+    printf("Enter City: ");
+    inputString("", city, sizeof(city));
+
+    printf("Enter Postal Code: ");
+    inputString("", postalCode, sizeof(postalCode));
+
+    printf("Enter Rent: ");
+    inputString("", rent, sizeof(rent));
+
+    printf("Enter Selling Price: ");
+    inputString("", sellingPrice, sizeof(sellingPrice));
+
+    snprintf(propertyData, sizeof(propertyData), "Property Name: %s\nAddress: %s\nCity: %s\nPostal Code: %s\nRent: %s\nSelling Price: %s", propertyName, address, city, postalCode, rent, sellingPrice);
 
     if (*chainLength == 0) {
-        *blockchain = createBlock(NULL, propertyData);
+        *blockchain = createBlock(NULL, propertyData, propertyName, address, city, postalCode, rent, sellingPrice);
     } else {
         struct Block *currentBlock = *blockchain;
         while (currentBlock->next != NULL) {
             currentBlock = currentBlock->next;
         }
-        currentBlock->next = createBlock(currentBlock, propertyData);
+        currentBlock->next = createBlock(currentBlock, propertyData, propertyName, address, city, postalCode, rent, sellingPrice);
     }
 
     (*chainLength)++;
@@ -126,20 +172,33 @@ void searchPropertyByName(struct Block *blockchain) {
     char propertyName[BLOCK_SIZE];
     int found = 0;
 
-    inputString("Enter Property Name to search: ", propertyName, sizeof(propertyName));
-    strlwr(propertyName); // Convert the search string to lowercase for case-insensitive search
+    printf("Enter Property Name to search: ");
+    inputString("", propertyName, sizeof(propertyName));
+
+    // Convert the input property name to lowercase
+    for (int i = 0; propertyName[i]; i++) {
+        propertyName[i] = tolower((unsigned char)propertyName[i]);
+    }
 
     struct Block *currentBlock = blockchain;
     int i = 1;
     while (currentBlock) {
-        char propertyDataLowerCase[BLOCK_SIZE];
-        strcpy(propertyDataLowerCase, currentBlock->data);
-        strlwr(propertyDataLowerCase); // Convert property data to lowercase for case-insensitive search
+        char propertyNameLowerCase[50];
+        // Convert the property name in the blockchain to lowercase
+        strcpy(propertyNameLowerCase, currentBlock->propertyName);
+        for (int j = 0; propertyNameLowerCase[j]; j++) {
+            propertyNameLowerCase[j] = tolower((unsigned char)propertyNameLowerCase[j]);
+        }
 
-        if (strstr(propertyDataLowerCase, propertyName) != NULL) {
+        if (strstr(propertyNameLowerCase, propertyName) != NULL) {
             found = 1;
             printf("Property #%d:\n", i);
-            printf("%s\n", currentBlock->originalData); // Display original case property data
+            printf("Property Name: %s\n", currentBlock->propertyName);
+            printf("Address: %s\n", currentBlock->address);
+            printf("City: %s\n", currentBlock->city);
+            printf("Postal Code: %s\n", currentBlock->postalCode);
+            printf("Rent: %s\n", currentBlock->rent);
+            printf("Selling Price: %s\n", currentBlock->sellingPrice);
             printf("Timestamp: %ld\n", currentBlock->timestamp);
             printf("Prev Hash: %s\n", currentBlock->prevHash);
             printf("Hash: %s\n\n", currentBlock->hash);
@@ -154,16 +213,20 @@ void searchPropertyByName(struct Block *blockchain) {
     }
 }
 
-// Function to clear the screen (platform-specific)
+void inputString(const char *prompt, char *dest, size_t destSize) {
+    printf("%s", prompt);
+    fgets(dest, destSize, stdin);
+    dest[strcspn(dest, "\n")] = '\0';
+}
+
 void clearScreen() {
 #ifdef _WIN32
-    system("cls"); // For Windows
+    system("cls");
 #else
-    system("clear"); // For Linux and macOS
+    system("clear");
 #endif
 }
 
-// Save the blockchain data to a .dat file
 void saveBlockchainToFile(const char *filename, struct Block *blockchain) {
     FILE *file = fopen(filename, "wb");
     if (file != NULL) {
@@ -178,7 +241,6 @@ void saveBlockchainToFile(const char *filename, struct Block *blockchain) {
     }
 }
 
-// Load the blockchain data from a .dat file
 struct Block *loadBlockchainFromFile(const char *filename) {
     FILE *file = fopen(filename, "rb");
     struct Block *blockchain = NULL;
@@ -218,6 +280,12 @@ int main() {
     genesisBlock->timestamp = time(NULL);
     strcpy(genesisBlock->data, "Genesis Block");
     strcpy(genesisBlock->originalData, "Genesis Block");
+    strcpy(genesisBlock->propertyName, "Genesis Property");
+    strcpy(genesisBlock->address, "Genesis Address");
+    strcpy(genesisBlock->city, "Genesis City");
+    strcpy(genesisBlock->postalCode, "000000");
+    strcpy(genesisBlock->rent, "N/A");
+    strcpy(genesisBlock->sellingPrice, "N/A");
     strcpy(genesisBlock->prevHash, "0");
     calculateHash(genesisBlock);
     genesisBlock->next = NULL;
@@ -225,12 +293,10 @@ int main() {
     struct Block *blockchain = genesisBlock;
     int chainLength = 1;
 
-    // Load the blockchain data from a .dat file if it exists
     struct Block *loadedBlockchain = loadBlockchainFromFile("blockchain.dat");
     if (loadedBlockchain != NULL) {
         freeBlockchain(blockchain);
         blockchain = loadedBlockchain;
-        // Recalculate the hashes
         struct Block *currentBlock = blockchain;
         while (currentBlock) {
             calculateHash(currentBlock);
@@ -257,15 +323,17 @@ int main() {
             sleep(1);
         }
 
-        clearScreen(); // Clear the screen after loading Registrar
+        clearScreen();
 
         if (isAdmin) {
+            char propertyToDelete[BLOCK_SIZE];
             while (1) {
                 printf("Options for Admin:\n");
                 printf("1. Add Property for Auction\n");
                 printf("2. Search Property by Name\n");
-                printf("3. View all Available Properties\n");
-                printf("4. Save and Exit\n");
+                printf("3. Delete Property by Name\n");
+                printf("4. View all Available Properties\n");
+                printf("5. Save and Exit\n");
                 printf("Enter your choice: ");
 
                 int choice;
@@ -275,16 +343,20 @@ int main() {
                 switch (choice) {
                     case 1:
                         addPropertyForAuction(&blockchain, &chainLength, isAdmin);
-                        // Save the updated blockchain to the .dat file
                         saveBlockchainToFile("blockchain.dat", blockchain);
                         break;
                     case 2:
                         searchPropertyByName(blockchain);
                         break;
                     case 3:
-                        displayBlockchain(blockchain);
+                        inputString("Enter Property Name to delete: ", propertyToDelete, sizeof(propertyToDelete));
+                        deletePropertyByName(&blockchain, &chainLength, propertyToDelete);
+                        saveBlockchainToFile("blockchain.dat", blockchain);
                         break;
                     case 4:
+                        displayBlockchain(blockchain);
+                        break;
+                    case 5:
                         printf("Exiting the program.\n");
                         freeBlockchain(blockchain);
                         exit(0);
@@ -292,7 +364,7 @@ int main() {
                         printf("Invalid choice. Please try again.\n");
                 }
             }
-        } else { // User
+        } else {
             while (1) {
                 printf("Options for User:\n");
                 printf("1. Search Property by Name\n");
