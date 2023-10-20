@@ -8,7 +8,7 @@
 #define BLOCK_SIZE 256
 #define MAX_USERS 10
 
-const char validCharacters[] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+const char validCharacters[] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz@#$%^-+&~";
 
 struct User {
     char username[50];
