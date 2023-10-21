@@ -69,9 +69,26 @@ struct Block *createBlock(struct Block *prevBlock, char *data, char *propertyNam
 void deletePropertyByName(struct Block **blockchain, int *chainLength, char *propertyName) {
     struct Block *currentBlock = *blockchain;
     struct Block *prevBlock = NULL;
+    int propertyFound = 0;
+    char propertyNameLowerCase[50];
+
+    // Convert the property name to lowercase for case-insensitive comparison
+    for (int j = 0; propertyName[j]; j++) {
+        propertyNameLowerCase[j] = tolower((unsigned char)propertyName[j]);
+    }
+    propertyNameLowerCase[strlen(propertyName)] = '\0';
 
     while (currentBlock) {
-        if (strcmp(currentBlock->propertyName, propertyName) == 0) {
+        char currentPropertyNameLowerCase[50];
+
+        //Convert the property name in the blockchain to lowercase for comparison
+        for (int j = 0; currentBlock->propertyName[j]; j++) {
+            currentPropertyNameLowerCase[j] = tolower((unsigned char)currentBlock->propertyName[j]);
+        }
+        currentPropertyNameLowerCase[strlen(currentBlock->propertyName)] = '\0';
+
+        if (strstr(currentPropertyNameLowerCase, propertyNameLowerCase) != NULL) {
+            propertyFound = 1;
             if (prevBlock) {
                 prevBlock->next = currentBlock->next;
             } else {
@@ -80,12 +97,15 @@ void deletePropertyByName(struct Block **blockchain, int *chainLength, char *pro
             free(currentBlock);
             (*chainLength)--;
             printf("Property '%s' deleted.\n", propertyName);
-            return;
+            break;
         }
         prevBlock = currentBlock;
         currentBlock = currentBlock->next;
     }
-    printf("Property '%s' not found.\n");
+
+    if (!propertyFound) {
+        printf("Property '%s' does not exist.\n");
+    }
 }
 
 void freeBlockchain(struct Block *head) {
@@ -137,6 +157,12 @@ void addPropertyForAuction(struct Block **blockchain, int *chainLength, int isAd
     printf("Enter Property Name: ");
     inputString("", propertyName, sizeof(propertyName));
 
+    // Check if the property name already exists
+    if (propertyExists(*blockchain, propertyName)) {
+        printf("This Property is Already Registered!\n");
+        return;
+    }
+
     printf("Enter Address: ");
     inputString("", address, sizeof(address));
 
@@ -166,6 +192,17 @@ void addPropertyForAuction(struct Block **blockchain, int *chainLength, int isAd
 
     (*chainLength)++;
     printf("Property added for auction.\n");
+}
+
+int propertyExists(struct Block *blockchain, const char *propertyName) {
+    struct Block *currentBlock = blockchain;
+    while (currentBlock) {
+        if (strcmp(currentBlock->propertyName, propertyName) == 0) {
+            return 1; // Property with the same name exists
+        }
+        currentBlock = currentBlock->next;
+    }
+    return 0; // Property with the same name doesn't exist
 }
 
 void searchPropertyByName(struct Block *blockchain) {
@@ -268,6 +305,86 @@ struct Block *loadBlockchainFromFile(const char *filename) {
     return blockchain;
 }
 
+void inputPassword(const char *prompt, char *password, size_t passwordSize) {
+    printf("%s", prompt);
+
+    int index = 0;
+    int ch;
+
+    while (1) {
+        ch = getch(); // Read a character without displaying it
+        if (ch == '\n' || ch == '\r') {
+            break; // Stop if Enter key is pressed
+        } else if (ch == '\b' || ch == 127) {
+            // Handle backspace or delete key
+            if (index > 0) {
+                printf("\b \b"); // Clear the character from the screen
+                index--;
+            }
+        } else if (index < passwordSize - 1) {
+            password[index++] = ch;
+            printf("*"); // Display an asterisk for each character
+        }
+    }
+
+    password[index] = '\0';
+    printf("\n");
+}
+
+void applyToListProperty(struct Block **blockchain, int *chainLength) {
+    char propertyData[BLOCK_SIZE];
+    char propertyName[50];
+    char address[100];
+    char city[50];
+    char postalCode[10];
+    char rent[20];
+    char sellingPrice[20];
+
+    printf("Enter Property Name: ");
+    inputString("", propertyName, sizeof(propertyName));
+
+    // Check if the property already exists
+    struct Block *currentBlock = *blockchain;
+    while (currentBlock) {
+        if (strcmp(currentBlock->propertyName, propertyName) == 0) {
+            printf("This Property Already Exists\n");
+            return;
+        }
+        currentBlock = currentBlock->next;
+    }
+
+    printf("Enter Address: ");
+    inputString("", address, sizeof(address));
+
+    printf("Enter City: ");
+    inputString("", city, sizeof(city));
+
+    printf("Enter Postal Code: ");
+    inputString("", postalCode, sizeof(postalCode));
+
+    printf("Enter Rent: ");
+    inputString("", rent, sizeof(rent));
+
+    printf("Enter Selling Price: ");
+    inputString("", sellingPrice, sizeof(sellingPrice));
+
+    snprintf(propertyData, sizeof(propertyData), "Property Name: %s\nAddress: %s\nCity: %s\nPostal Code: %s\nRent: %s\nSelling Price: %s", propertyName, address, city, postalCode, rent, sellingPrice);
+
+    if (*chainLength == 0) {
+        *blockchain = createBlock(NULL, propertyData, propertyName, address, city, postalCode, rent, sellingPrice);
+    } else {
+        struct Block *currentBlock = *blockchain;
+        while (currentBlock->next != NULL) {
+            currentBlock = currentBlock->next;
+        }
+        currentBlock->next = createBlock(currentBlock, propertyData, propertyName, address, city, postalCode, rent, sellingPrice);
+    }
+
+    (*chainLength)++;
+    printf("Your Property listing application submitted successfully.\n Your Property will be added after review.\n");
+}
+
+
 int main() {
     struct User users[MAX_USERS] = {
         {"admin", "adminpass", 1},
@@ -310,7 +427,7 @@ int main() {
 
     printf("Login:\n");
     inputString("Username: ", username, sizeof(username));
-    inputString("Password: ", password, sizeof(password));
+    inputPassword("Password: ", password, sizeof(password));
 
     if (authenticateUser(users, numUsers, username, password, &isAdmin)) {
         printf("Login successful!\n");
@@ -369,7 +486,8 @@ int main() {
                 printf("Options for User:\n");
                 printf("1. Search Property by Name\n");
                 printf("2. View all Available Properties\n");
-                printf("3. Save and Exit\n");
+                printf("3. Apply to List Your Property\n");
+                printf("4. Save and Exit\n");
                 printf("Enter your choice: ");
 
                 int choice;
@@ -384,6 +502,9 @@ int main() {
                         displayBlockchain(blockchain);
                         break;
                     case 3:
+                        applyToListProperty(&blockchain, &chainLength);
+                        break;
+                    case 4:
                         printf("Exiting the program.\n");
                         freeBlockchain(blockchain);
                         exit(0);
